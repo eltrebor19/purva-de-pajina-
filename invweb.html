@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <title>Inventario Simple</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/@supabase/supabase-js"></script>
+</head>
+<body class="bg-gray-100 min-h-screen flex items-center justify-center p-4">
+
+  <div class="bg-white shadow-lg rounded-xl w-full max-w-md p-6 space-y-6">
+    <h1 class="text-2xl font-bold text-center text-blue-600">📦 Inventario</h1>
+
+    <!-- LOGIN -->
+    <div id="login-section" class="space-y-4">
+      <input id="username" placeholder="Usuario" class="w-full border p-2 rounded" />
+      <input id="password" type="password" placeholder="Contraseña" class="w-full border p-2 rounded" />
+      <button onclick="login()" class="w-full bg-blue-600 text-white py-2 rounded">Iniciar sesión</button>
+      <button onclick="register()" class="w-full bg-gray-300 text-gray-800 py-2 rounded">Registrarse</button>
+    </div>
+
+    <!-- INVENTARIO -->
+    <div id="app-section" class="hidden space-y-4">
+      <div class="flex justify-between items-center">
+        <h2 class="text-lg font-semibold">Hola, <span id="user-name" class="text-blue-600"></span></h2>
+        <button onclick="logout()" class="text-sm text-red-500">Cerrar sesión</button>
+      </div>
+
+      <select id="producto" class="w-full border p-2 rounded">
+        <option value="Laptop">Laptop</option>
+        <option value="Monitor">Monitor</option>
+        <option value="Teclado">Teclado</option>
+        <option value="Mouse">Mouse</option>
+      </select>
+
+      <input id="cantidad" type="number" placeholder="Cantidad" class="w-full border p-2 rounded" />
+      <select id="tipo" class="w-full border p-2 rounded">
+        <option value="entrada">Entrada</option>
+        <option value="salida">Salida</option>
+      </select>
+
+      <button onclick="registrarMovimiento()" class="w-full bg-green-600 text-white py-2 rounded">Registrar</button>
+
+      <div>
+        <h3 class="font-semibold">📊 Total en almacén</h3>
+        <ul id="inventario-total" class="text-sm mt-2 space-y-1 text-gray-700"></ul>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // CONFIGURA TU SUPABASE
+    const supabase = supabase.createClient(
+      "https://opuoetzvuitudpckspbc.supabase.co", // Reemplazar
+      "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9wdW9ldHp2dWl0dWRwY2tzcGJjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDUwMjg3NTUsImV4cCI6MjA2MDYwNDc1NX0.waqOgDtb6BxoW8c4olUQ5VUKLXt7S9wrWh6OgL-wQMs"              // Reemplazar
+    );
+
+    let currentUser = null;
+
+    async function login() {
+      const username = document.getElementById("username").value.trim();
+      const password = document.getElementById("password").value;
+
+      const { data, error } = await supabase
+        .from("usuarios")
+        .select("*")
+        .eq("username", username)
+        .eq("password", password)
+        .single();
+
+      if (error || !data) {
+        alert("Usuario o contraseña incorrectos");
+        return;
+      }
+
+      currentUser = data;
+      mostrarApp();
+    }
+
+    async function register() {
+      const username = document.getElementById("username").value.trim();
+      const password = document.getElementById("password").value;
+
+      if (!username || !password) return alert("Usuario y contraseña requeridos");
+
+      const { error } = await supabase.from("usuarios").insert([{ username, password }]);
+
+      if (error) return alert("Error al registrar");
+      alert("Usuario registrado. Ahora inicia sesión.");
+    }
+
+    function mostrarApp() {
+      document.getElementById("login-section").classList.add("hidden");
+      document.getElementById("app-section").classList.remove("hidden");
+      document.getElementById("user-name").textContent = currentUser.username;
+      cargarResumen();
+    }
+
+    function logout() {
+      currentUser = null;
+      location.reload();
+    }
+
+    async function registrarMovimiento() {
+      const producto = document.getElementById("producto").value;
+      const cantidad = parseInt(document.getElementById("cantidad").value);
+      const tipo = document.getElementById("tipo").value;
+
+      if (!producto || !cantidad || cantidad <= 0) {
+        alert("Datos incorrectos");
+        return;
+      }
+
+      await supabase.from("inventario").insert([{
+        producto,
+        cantidad,
+        tipo,
+        usuario: currentUser.username
+      }]);
+
+      document.getElementById("cantidad").value = "";
+      cargarResumen();
+    }
+
+    async function cargarResumen() {
+      const { data } = await supabase.from("inventario").select("*");
+      const resumen = {};
+
+      data.forEach(item => {
+        if (!resumen[item.producto]) resumen[item.producto] = 0;
+        resumen[item.producto] += item.tipo === "entrada" ? item.cantidad : -item.cantidad;
+      });
+
+      const lista = document.getElementById("inventario-total");
+      lista.innerHTML = "";
+
+      for (let prod in resumen) {
+        const li = document.createElement("li");
+        li.textContent = `${prod}: ${resumen[prod]} unidades`;
+        lista.appendChild(li);
+      }
+    }
+  </script>
+</body>
+</html>
